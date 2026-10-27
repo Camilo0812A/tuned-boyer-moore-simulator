@@ -1,0 +1,549 @@
+<title>Tuned Boyer-Moore Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a dark "lab instrument" workspace in UFPS red. Input rack on the left, the tape (oscilloscope) as the hero,
+   a transport bar with a scrubbable timeline, then three synced instruments (Java code, bmBc table, counters),
+   and at the bottom the reading map and the race against brute force and Horspool. */
+:root{
+  --bg:#121311; --panel:#1b1c1a; --panel-2:#232421; --line:#30322e; --line-2:#44463f;
+  --fg:#f2efe9; --fg-2:#c9c4bb; --muted:#8c877e;
+  --red:#e3262b; --red-2:#b51d1f; --red-glow:rgba(227,38,43,.45);
+  --ok:#3fd07f; --ok-2:rgba(63,208,127,.16); --amber:#f3b23c; --amber-2:rgba(243,178,60,.14); --blue:#6fb6ff;
+  --f-body:"Poppins","Segoe UI",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  --cw:34px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-weight:300;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(circle at 85% -10%,rgba(227,38,43,.18),transparent 40%),linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:auto,48px 48px,48px 48px;background-attachment:fixed}
+b,strong{font-weight:600}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:#0c0d0b}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:rgba(12,13,11,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .in{max-width:1500px;margin:0 auto;display:flex;align-items:center;gap:16px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top img{height:54px;width:auto}
+.top .t{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.top .t b{font-size:1.05rem;font-weight:600;letter-spacing:.01em}
+.top .t b span{color:var(--red)}
+.top .t small{color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .sp{flex:1}
+.pill{font-family:var(--f-mono);font-size:.72rem;padding:4px 10px;border:1px solid var(--line-2);border-radius:999px;color:var(--fg-2);white-space:nowrap}
+
+.wrap{max-width:1500px;margin:0 auto;padding-block:18px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+.row1{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+.row2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.8fr) minmax(0,.95fr);gap:16px;align-items:stretch}
+.row3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px;align-items:stretch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0;position:relative}
+.panel>h2{margin:0 0 12px;font-size:.72rem;font-family:var(--f-mono);font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px}
+.panel>h2::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red)}
+.panel>h2 .r{margin-left:auto;letter-spacing:.04em;text-transform:none;color:var(--fg-2)}
+
+/* inputs */
+.lbl{display:block;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.chip{all:unset;cursor:pointer;font-size:.8rem;padding:6px 11px;border-radius:999px;border:1px solid var(--line-2);color:var(--fg-2);transition:background .2s,border-color .2s,color .2s}
+.chip:hover{border-color:var(--red);color:var(--fg)}
+.chip.on{background:var(--red);border-color:var(--red);color:#fff}
+.chip:focus-visible{outline:2px solid var(--red)}
+textarea,input[type=text]{width:100%;min-width:0;background:#0f100e;border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;font-family:var(--f-mono);font-size:.88rem;color:var(--fg);resize:vertical}
+textarea{min-height:92px}
+textarea:focus,input[type=text]:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(227,38,43,.2)}
+.hint{font-size:.74rem;color:var(--muted);margin-top:4px;font-family:var(--f-mono)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;border-radius:8px;border:1px solid var(--line-2);background:var(--panel-2);cursor:pointer;font-weight:500;font-size:.88rem;transition:background .2s,border-color .2s,transform .15s}
+.btn:hover{border-color:var(--fg-2)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 8px 24px -10px var(--red-glow)}
+.btn.primary:hover{background:var(--red-2)}
+.btn:disabled{opacity:.35;cursor:default;transform:none}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.toggle{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:10px 12px;border:1px dashed var(--line-2);border-radius:8px;cursor:pointer;font-size:.82rem;color:var(--fg-2)}
+.toggle input{accent-color:var(--red);width:16px;height:16px;margin-top:2px;flex:none}
+.toggle b{color:var(--fg)}
+.err{color:#ff8a8d;font-size:.8rem;min-height:1.2em;margin-top:8px;font-family:var(--f-mono)}
+
+/* tape */
+.scope{background:#0d0e0c;border:1px solid var(--line);border-radius:10px;padding:14px 0 6px;position:relative;overflow:hidden}
+.scope::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px)}
+.tapebox{overflow-x:auto;overflow-y:hidden;padding:30px 14px 10px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.lane{position:relative;display:inline-flex;flex-direction:column;gap:6px}
+.trow{display:flex}
+.c{flex:0 0 var(--cw);width:var(--cw);height:40px;margin-right:2px;display:grid;place-items:center;font-family:var(--f-mono);font-weight:600;font-size:1rem;border-radius:5px;background:#1a1b19;border:1px solid var(--line);color:var(--fg-2);position:relative;transition:background .2s,color .2s,box-shadow .2s,transform .2s,border-color .2s}
+.idx .c{height:16px;background:none;border:none;font-size:.6rem;color:var(--muted);font-weight:400}
+.c.read::after{content:"";position:absolute;left:30%;right:30%;bottom:3px;height:2px;border-radius:2px;background:var(--red);opacity:.65}
+.c.sent{border-style:dashed;border-color:var(--amber);color:var(--amber);background:var(--amber-2)}
+.c.matched{background:var(--ok-2);border-color:var(--ok);color:var(--ok)}
+.c.fake{background:repeating-linear-gradient(45deg,rgba(227,38,43,.25) 0 6px,transparent 6px 12px);border-color:var(--red);color:#ffb0b2}
+.c.probe{background:var(--red);border-color:var(--red);color:#fff;transform:translateY(-5px);box-shadow:0 0 0 3px rgba(227,38,43,.25),0 10px 24px -6px var(--red-glow)}
+.c.probe.red{opacity:.55}
+.c.ok{background:var(--ok);border-color:var(--ok);color:#0b2416}
+.c.bad{background:#f2efe9;border-color:#f2efe9;color:#121311}
+.prow{position:relative;height:40px}
+.pat{position:absolute;left:0;top:0;display:flex;transition:transform .35s cubic-bezier(.3,1.25,.5,1)}
+.pat .c{background:#262722;border:1.5px solid var(--fg-2);color:var(--fg)}
+.pat .c.last{border-color:var(--red);color:#ff9497}
+.pat .c.ok{background:var(--ok);border-color:var(--ok);color:#0b2416}
+.pat .c.bad{background:#f2efe9;border-color:#f2efe9;color:#121311}
+.kbadge{position:absolute;top:-28px;left:50%;transform:translateX(-50%);font-family:var(--f-mono);font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--red);color:#fff;white-space:nowrap;pointer-events:none}
+.kbadge.zero{background:var(--ok);color:#0b2416}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 14px 2px;font-size:.74rem;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* transport */
+.transport{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.tb{all:unset;cursor:pointer;width:40px;height:38px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--line-2);background:var(--panel-2);transition:background .2s,border-color .2s}
+.tb:hover{border-color:var(--fg-2)}
+.tb:focus-visible{outline:2px solid var(--red)}
+.tb.play{width:52px;background:var(--red);border-color:var(--red)}
+.tb.play:hover{background:var(--red-2)}
+.tb[aria-disabled="true"]{opacity:.35;cursor:default}
+.tb svg{width:18px;height:18px;fill:currentColor}
+.speed{display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:.76rem;color:var(--muted);margin-left:4px}
+.speed select{background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:6px 8px}
+.stepl{margin-left:auto;font-family:var(--f-mono);font-size:.82rem;color:var(--fg-2);font-variant-numeric:tabular-nums}
+.timeline{position:relative;margin-top:12px;padding-bottom:12px}
+.timeline input{width:100%;accent-color:var(--red);margin:0}
+.ticks{position:absolute;left:8px;right:8px;bottom:0;height:10px;pointer-events:none}
+.ticks i{position:absolute;bottom:0;width:3px;height:10px;border-radius:2px;background:var(--ok);transform:translateX(-50%)}
+.ticks i.fake{background:var(--red)}
+.narr{margin-top:10px;padding:12px 14px;border-radius:8px;background:#0f100e;border-left:3px solid var(--red);font-family:var(--f-mono);font-size:.86rem;min-height:3.4em;color:var(--fg)}
+.narr .tg{font-weight:700;color:var(--red);margin-right:6px}
+.narr .tg.g{color:var(--ok)}
+.narr .tg.a{color:var(--amber)}
+
+/* code */
+.code{margin:0;font-family:var(--f-mono);font-size:.8rem;line-height:1.7;overflow-x:auto;white-space:pre;background:#0f100e;border-radius:8px;padding:10px 0}
+.code .ln{display:block;padding:0 14px 0 10px;border-left:3px solid transparent;transition:background .2s}
+.code .ln .no{display:inline-block;width:22px;color:#55574f;user-select:none}
+.code .ln.hl{background:rgba(227,38,43,.2);border-left-color:var(--red)}
+.code .kw{color:#ff7d80}.code .ty{color:#f6c3a5}.code .cm{color:#6c6f66;font-style:italic}.code .nu{color:#ffd27f}
+
+/* bmBc */
+.bm{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.bm .e{display:flex;flex-direction:column;align-items:center;padding:10px 4px;border-radius:8px;border:1px solid var(--line-2);background:#151613;transition:border-color .2s,box-shadow .2s,transform .2s}
+.bm .e small{font-family:var(--f-mono);font-size:.7rem;color:var(--muted)}
+.bm .e b{font-family:var(--f-mono);font-size:1.35rem;font-weight:700}
+.bm .e.zero b{color:var(--red)}
+.bm .e.zero s{font-size:.75rem;color:var(--muted);font-weight:400;margin-right:4px}
+.bm .e.hit{border-color:var(--red);box-shadow:0 0 0 2px rgba(227,38,43,.3),0 0 22px -4px var(--red-glow);transform:translateY(-3px)}
+.shiftbox{margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:#151613;border:1px solid var(--line-2);font-family:var(--f-mono);font-size:.82rem;color:var(--fg-2)}
+.shiftbox b{font-size:1.2rem;color:var(--amber)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.st{padding:10px 12px;border-radius:8px;background:#151613;border:1px solid var(--line)}
+.st small{display:block;font-family:var(--f-mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.st b{font-family:var(--f-mono);font-size:1.45rem;font-weight:700;font-variant-numeric:tabular-nums}
+.st.wide{grid-column:1/-1}
+.meter{height:8px;border-radius:6px;background:#2a2b27;overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--red),#ff6a6d);width:0;transition:width .25s}
+
+/* map + race */
+canvas{display:block;width:100%;border-radius:6px;background:#0f100e}
+.mapnote{font-size:.78rem;color:var(--muted);margin-top:8px}
+.race{display:flex;flex-direction:column;gap:12px}
+.lane2{display:grid;grid-template-columns:120px minmax(0,1fr) 110px;gap:10px;align-items:center}
+.lane2 .nm{font-size:.82rem;font-weight:500}
+.lane2 .nm small{display:block;color:var(--muted);font-weight:300;font-size:.7rem}
+.lane2 .v{font-family:var(--f-mono);font-size:.8rem;text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-2)}
+.lane2 .v b{display:block;font-size:1rem;color:var(--fg)}
+.lane2 canvas{height:30px}
+.verdict{padding:12px 14px;border-radius:8px;background:rgba(63,208,127,.08);border:1px solid rgba(63,208,127,.35);font-size:.86rem}
+.verdict b{color:var(--ok)}
+
+details.help{font-size:.84rem;color:var(--fg-2)}
+details.help summary{cursor:pointer;color:var(--fg);font-weight:500}
+details.help ul{margin:8px 0 0;padding-left:1.1em}
+kbd{font-family:var(--f-mono);font-size:.74rem;border:1px solid var(--line-2);border-radius:4px;padding:0 5px;background:#0f100e}
+footer{max-width:1500px;margin:0 auto;padding-block:0 30px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 18px}
+
+@media (max-width:1150px){.row1{grid-template-columns:minmax(0,1fr)}.row2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.row2 .codep{grid-column:1/-1}.row3{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){:root{--cw:28px}.row2{grid-template-columns:minmax(0,1fr)}.top .pill{display:none}.lane2{grid-template-columns:90px minmax(0,1fr) 84px}.top img{height:34px}.stepl{margin-left:0;width:100%}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<header class="top">
+  <div class="in">
+    <img alt="Universidad Francisco de Paula Santander" src="data:image/png;base64,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">
+    <div class="t"><b>Tuned Boyer‑Moore <span>Lab</span></b><small>Analysis of Algorithms · UFPS · Camilo Colmenares · Didier Gómez</small></div>
+    <span class="sp"></span>
+    <span class="pill">Hume &amp; Sunday, 1991</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="row1">
+    <section class="panel" aria-labelledby="h-in">
+      <h2 id="h-in">Input</h2>
+      <span class="lbl">Try an example</span>
+      <div class="presets" id="presets"></div>
+      <label class="lbl" for="txt">Text y</label>
+      <textarea id="txt" spellcheck="false"></textarea>
+      <div class="hint" id="txtInfo">—</div>
+      <label class="lbl" for="pat">Pattern x</label>
+      <input type="text" id="pat" spellcheck="false" maxlength="40" autocomplete="off">
+      <label class="toggle" for="lecroq"><input type="checkbox" id="lecroq"><span><b>Use j &lt; n</b> (Lecroq's loop condition) instead of <b>j ≤ n − m</b>. Turn it on with the "Sentinel trap" example to see a false match.</span></label>
+      <div class="row-btns">
+        <button class="btn primary" id="run" type="button">Run ▸</button>
+        <span class="btn filebtn">Load .txt<input type="file" id="file" accept=".txt,text/plain" aria-label="Load a .txt file"></span>
+      </div>
+      <div class="err" id="err" role="alert"></div>
+      <details class="help">
+        <summary>How to use</summary>
+        <ul>
+          <li>Pick an example or type your own text and pattern, then press <b>Run</b>.</li>
+          <li><kbd>→</kbd> / <kbd>←</kbd> step forward / back · <kbd>Space</kbd> play / pause · <kbd>M</kbd> next match · <kbd>Home</kbd> / <kbd>End</kbd>.</li>
+          <li>Drag the timeline to jump to any moment of the search.</li>
+          <li>The step‑by‑step view uses the first 2,000 characters; the race below uses the whole text.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="h-tape">
+      <h2 id="h-tape">The search, step by step <span class="r" id="tapeInfo"></span></h2>
+      <div class="scope">
+        <div class="tapebox" id="tapebox">
+          <div class="lane" id="lane">
+            <div class="trow idx" id="rIdx"></div>
+            <div class="trow" id="rTxt"></div>
+            <div class="prow"><div class="pat" id="rPat"></div></div>
+          </div>
+        </div>
+        <div class="legend"><span><i style="background:var(--red)"></i>probe</span><span><i style="background:var(--ok)"></i>equal</span><span><i style="background:#f2efe9"></i>different</span><span><i style="background:var(--amber-2);border:1px dashed var(--amber)"></i>sentinel</span><span><i style="background:var(--ok-2);border:1px solid var(--ok)"></i>match</span><span><i style="background:var(--red);height:3px;vertical-align:2px"></i>already read</span></div>
+      </div>
+      <div class="transport" role="group" aria-label="Playback">
+        <button class="tb" id="tFirst" type="button" aria-label="First step" title="First (Home)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="tb" id="tPrev" type="button" aria-label="Previous step" title="Previous (←)"><svg viewBox="0 0 24 24"><path d="M18 5v14L7 12z"/></svg></button>
+        <button class="tb play" id="tPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 5v14l12-7z"/></svg></button>
+        <button class="tb" id="tNext" type="button" aria-label="Next step" title="Next (→)"><svg viewBox="0 0 24 24"><path d="M6 5v14l11-7z"/></svg></button>
+        <button class="tb" id="tMatch" type="button" aria-label="Next match" title="Next match (M)"><svg viewBox="0 0 24 24"><path d="M4 5v14l8-7zM12 5v14l8-7z"/></svg></button>
+        <button class="tb" id="tEnd" type="button" aria-label="Last step" title="End (End)"><svg viewBox="0 0 24 24"><path d="M4 5v14l11-7zM16 5h2v14h-2z"/></svg></button>
+        <label class="speed" for="spd">speed <select id="spd"><option value="900">0.5×</option><option value="480" selected>1×</option><option value="220">2×</option><option value="90">4×</option><option value="25">turbo</option></select></label>
+        <span class="stepl" id="stepl">Step 0 / 0</span>
+      </div>
+      <div class="timeline"><input type="range" id="scrub" min="0" max="0" value="0" aria-label="Timeline"><div class="ticks" id="ticks"></div></div>
+      <div class="narr" id="narr" aria-live="polite">—</div>
+    </section>
+  </div>
+
+  <div class="row2">
+    <section class="panel codep" aria-labelledby="h-code">
+      <h2 id="h-code">TunedBoyerMoore.java <span class="r">line running now</span></h2>
+      <pre class="code" id="code"></pre>
+    </section>
+    <section class="panel" aria-labelledby="h-bm">
+      <h2 id="h-bm">bmBc table <span class="r" id="bmInfo"></span></h2>
+      <div class="bm" id="bm"></div>
+      <div class="shiftbox"><span>shift = original bmBc[x[m−1]]</span><b id="shiftV">—</b></div>
+    </section>
+    <section class="panel" aria-labelledby="h-st">
+      <h2 id="h-st">Counters</h2>
+      <div class="stats">
+        <div class="st"><small>window j</small><b id="vJ">0</b></div>
+        <div class="st"><small>matches</small><b id="vM" style="color:var(--ok)">0</b></div>
+        <div class="st"><small>probes (bmBc reads)</small><b id="vP" style="color:#ff8a8d">0</b></div>
+        <div class="st"><small>comparisons</small><b id="vC">0</b></div>
+        <div class="st wide"><small>text characters read so far</small><b id="vR">0%</b><div class="meter"><i id="vRbar"></i></div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="row3">
+    <section class="panel" aria-labelledby="h-map">
+      <h2 id="h-map">Reading map <span class="r" id="mapInfo"></span></h2>
+      <canvas id="map" height="120" aria-label="Map of the text: which characters the algorithm has read"></canvas>
+      <p class="mapnote">Each cell is one character of the text. <b style="color:#ff8a8d">Red</b>: read by a probe · <b style="color:var(--ok)">green</b>: read while verifying · dark: never read. Tuned Boyer‑Moore leaves most of the text untouched.</p>
+    </section>
+    <section class="panel" aria-labelledby="h-race">
+      <h2 id="h-race">Race on the whole text <span class="r" id="raceInfo"></span></h2>
+      <div class="race" id="race"></div>
+      <div class="verdict" id="verdict" style="margin-top:12px">—</div>
+    </section>
+  </div>
+</main>
+<footer><span>Tuned Boyer‑Moore Lab · Analysis of Algorithms · Universidad Francisco de Paula Santander</span><span>Camilo Colmenares · Didier Gómez</span></footer>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const VIS_MAX = 2000;
+
+/* ---------------- Engine (same as the Java class) ---------------- */
+function buildTable(x){
+  const m = x.length, t = new Map();
+  for (let i = 0; i < m - 1; i++) t.set(x[i], m - 1 - i);
+  const last = x[m - 1], orig = t.has(last) ? t.get(last) : m;
+  t.set(last, 0);
+  return { t, shift: orig, orig, m, get: c => (t.has(c) ? t.get(c) : m) };
+}
+function tbmEvents(x, y, lecroq){
+  const m = x.length, n = y.length, T = buildTable(x), Y = y + x[m - 1].repeat(m);
+  const lim = lecroq ? n - 1 : n - m, E = [];
+  let j = 0, k;
+  const probe = (line, red) => { const pos = j + m - 1, ch = Y[pos], kk = T.get(ch); E.push({ t:"probe", j, pos, ch, k:kk, sent:pos >= n, red, line }); return kk; };
+  while (j <= lim){
+    k = probe(3, false);
+    while (k !== 0){ for (let r = 0; r < 3; r++){ const was = k; j += k; k = probe(5 + r, was === 0); } }
+    if (j <= lim){
+      let i = 0;
+      for (; i < m - 1; i++){ const ok = x[i] === Y[j + i]; E.push({ t:"cmp", j, i, pos:j + i, ok, line:9 }); if (!ok) break; }
+      if (i === m - 1) E.push({ t:"match", j, fake: j > n - m, line:10 });
+    } else E.push({ t:"out", j, line:9 });
+    const from = j; j += T.shift; E.push({ t:"shift", from, to:j, line:11 });
+  }
+  E.push({ t:"end", line:13 });
+  return { E, T, Y, lim };
+}
+/* read counters for the race (whole text, no events) */
+function readsNaive(x, y){ const m = x.length, n = y.length, R = new Uint32Array(n); let tot = 0, c = 0; for (let j = 0; j <= n - m; j++){ let i = 0; while (i < m){ R[j + i]++; tot++; if (x[i] !== y[j + i]) break; i++; } if (i === m) c++; } return { R, tot, c }; }
+function readsHor(x, y){ const m = x.length, n = y.length, R = new Uint32Array(n), T = new Map(); for (let i = 0; i < m - 1; i++) T.set(x[i], m - 1 - i); const g = ch => T.has(ch) ? T.get(ch) : m; let j = 0, tot = 0, c = 0; while (j <= n - m){ const ch = y[j + m - 1]; R[j + m - 1]++; tot++; if (ch === x[m - 1]){ let i = 0; while (i < m - 1){ R[j + i]++; tot++; if (x[i] !== y[j + i]) break; i++; } if (i === m - 1) c++; } j += g(ch); } return { R, tot, c }; }
+function readsTbm(x, y){ const m = x.length, n = y.length, R = new Uint32Array(n), T = buildTable(x), Y = y + x[m - 1].repeat(m); let j = 0, k, tot = 0, c = 0; const rd = p => { if (p < n) R[p]++; tot++; return T.get(Y[p]); }; while (j <= n - m){ k = rd(j + m - 1); while (k !== 0){ j += k; k = rd(j + m - 1); j += k; k = rd(j + m - 1); j += k; k = rd(j + m - 1); } if (j <= n - m){ let i = 0; while (i < m - 1){ R[j + i]++; tot++; if (x[i] !== Y[j + i]) break; i++; } if (i === m - 1) c++; } j += T.shift; } return { R, tot, c }; }
+
+/* ---------------- Presets ---------------- */
+const SPANISH = "el algoritmo mira el ultimo caracter de la ventana y si esa letra no esta en el patron salta la ventana completa, asi recorre el texto sin leer la mayoria de sus letras y encuentra el patron mucho mas rapido que la fuerza bruta, que compara cada posicion del texto una por una";
+const PRESETS = [
+  { name:"Classic (Lecroq)", x:"GCAGAGAG", y:"GCATCGCAGAGAGTATACAGTACG", lec:false },
+  { name:"Spanish text", x:"patron", y:SPANISH, lec:false },
+  { name:"Best case", x:"abcd", y:"xyzw".repeat(12), lec:false },
+  { name:"Worst case", x:"aaaa", y:"a".repeat(24), lec:false },
+  { name:"Overlaps", x:"ana", y:"banana and ana", lec:false },
+  { name:"Sentinel trap", x:"aa", y:"ba", lec:true }
+];
+
+/* ---------------- Java code shown ---------------- */
+const CODE = [
+  "int j = 0, k;",
+  "Arrays.fill(y, n, n + m, patron[m - 1]);   // sentinel",
+  "while (j <= n - m) {",
+  "    k = bmBc[y[j + m - 1] & 0xFF];           // probe",
+  "    while (k != 0) {                         // ufast",
+  "        j += k; k = bmBc[y[j + m - 1] & 0xFF];",
+  "        j += k; k = bmBc[y[j + m - 1] & 0xFF];",
+  "        j += k; k = bmBc[y[j + m - 1] & 0xFF];",
+  "    }",
+  "    if (j <= n - m && coincide(y, j))        // verify",
+  "        posiciones.insertarAlFinal(j);",
+  "    j += shift;",
+  "}",
+  "return posiciones;"
+];
+const KW = /^(int|while|if|return|new)$/;
+function hl(src){
+  const re = /(\/\/[^\n]*)|\b(\d+)\b|\b([A-Za-z_][A-Za-z0-9_]*)\b/g; let out = "", last = 0, m;
+  while ((m = re.exec(src))){ out += esc(src.slice(last, m.index)); last = re.lastIndex;
+    if (m[1]) out += `<span class="cm">${esc(m[1])}</span>`; else if (m[2]) out += `<span class="nu">${m[2]}</span>`;
+    else out += KW.test(m[3]) ? `<span class="kw">${m[3]}</span>` : /^[A-Z][a-z]/.test(m[3]) ? `<span class="ty">${m[3]}</span>` : m[3]; }
+  return out + esc(src.slice(last));
+}
+function drawCode(lec){
+  const lines = CODE.map(l => lec ? l.replace("j <= n - m", "j < n").replace("j <= n - m &&", "j < n &&") : l);
+  if (lec) lines[9] = lines[9].replace("j <= n - m", "j < n");
+  $("#code").innerHTML = lines.map((l, i) => `<span class="ln" data-l="${i}"><span class="no">${i + 1}</span>${hl(l)}</span>`).join("");
+}
+
+/* ---------------- State ---------------- */
+let S = null, k = 0, timer = null, fullText = "";
+const els = { idx:$("#rIdx"), txt:$("#rTxt"), pat:$("#rPat"), box:$("#tapebox") };
+
+function prepare(x, y, lec){
+  const vis = y.slice(0, VIS_MAX), r = tbmEvents(x, vis, lec), E = r.E, n = vis.length, m = x.length;
+  const N = E.length;
+  const cj = new Int32Array(N + 1), cp = new Int32Array(N + 1), cc = new Int32Array(N + 1), cm = new Int32Array(N + 1), cf = new Int32Array(N + 1), cr = new Int32Array(N + 1);
+  const firstRead = new Int32Array(n).fill(-1), kind = new Uint8Array(n), matchAt = new Int32Array(n + m).fill(-1), fakeAt = new Int32Array(n + m).fill(-1);
+  let distinct = 0;
+  for (let q = 0; q < N; q++){
+    const e = E[q]; cj[q + 1] = cj[q]; cp[q + 1] = cp[q]; cc[q + 1] = cc[q]; cm[q + 1] = cm[q]; cf[q + 1] = cf[q];
+    const touch = (p, kd) => { if (p < n && firstRead[p] < 0){ firstRead[p] = q + 1; kind[p] = kd; distinct++; } };
+    if (e.t === "probe"){ cj[q + 1] = e.j; cp[q + 1]++; touch(e.pos, 1); }
+    else if (e.t === "cmp"){ cc[q + 1]++; touch(e.pos, 2); }
+    else if (e.t === "match"){ if (e.fake) cf[q + 1]++; else cm[q + 1]++; for (let i = e.j; i < e.j + m; i++){ if (e.fake){ if (fakeAt[i] < 0) fakeAt[i] = q + 1; } else if (matchAt[i] < 0) matchAt[i] = q + 1; } }
+    else if (e.t === "shift"){ cj[q + 1] = e.to; }
+    cr[q + 1] = distinct;
+  }
+  return { x, y:vis, n, m, lec, E, T:r.T, Y:r.Y, cj, cp, cc, cm, cf, cr, firstRead, kind, matchAt, fakeAt, truncated: y.length > VIS_MAX };
+}
+
+function buildTape(){
+  const { n, m, Y, x } = S, tot = n + m;
+  els.idx.innerHTML = Array.from({ length: tot }, (_, i) => `<div class="c">${i}</div>`).join("");
+  els.txt.innerHTML = Array.from({ length: tot }, (_, i) => `<div class="c${i >= n ? " sent" : ""}" title="${i >= n ? "sentinel" : "y[" + i + "]"}">${esc(Y[i] === " " ? "·" : Y[i])}</div>`).join("");
+  els.pat.innerHTML = [...x].map((c, i) => `<div class="c${i === m - 1 ? " last" : ""}">${esc(c === " " ? "·" : c)}</div>`).join("");
+  // bmBc chips
+  const keys = [...new Set(x.slice(0, m - 1))]; if (!keys.includes(x[m - 1])) keys.push(x[m - 1]);
+  $("#bm").innerHTML = keys.map(c => { const z = c === x[m - 1]; return `<div class="e${z ? " zero" : ""}" data-ch="${esc(c)}"><small>bmBc['${esc(c === " " ? "·" : c)}']</small><b>${z ? `<s>${S.T.orig}</s>0` : S.T.get(c)}</b></div>`; }).join("") + `<div class="e" data-ch="__other"><small>other</small><b>${m}</b></div>`;
+  $("#shiftV").textContent = S.T.shift;
+  $("#bmInfo").textContent = `m = ${m}`;
+  // timeline ticks
+  const N = S.E.length;
+  $("#scrub").max = N; $("#ticks").innerHTML = S.E.map((e, q) => e.t === "match" ? `<i class="${e.fake ? "fake" : ""}" style="left:${((q + 1) / N) * 100}%"></i>` : "").join("");
+  $("#tapeInfo").textContent = `n = ${n}${S.truncated ? " (first 2,000 chars)" : ""} · m = ${m}`;
+  drawCode(S.lec);
+}
+
+let prevMarks = [];
+function render(){
+  if (!S) return;
+  const { E, n, m, x, Y } = S, N = E.length, e = E[k - 1];
+  const cells = els.txt.children, pcells = els.pat.children;
+  // persistent states (read / matched) — full recompute from the precomputed arrays
+  for (let i = 0; i < n + m; i++){
+    const c = cells[i]; if (!c) continue;
+    c.classList.toggle("read", i < n && S.firstRead[i] > 0 && S.firstRead[i] <= k);
+    c.classList.toggle("matched", S.matchAt[i] > 0 && S.matchAt[i] <= k);
+    c.classList.toggle("fake", S.fakeAt[i] > 0 && S.fakeAt[i] <= k);
+  }
+  // transient marks
+  prevMarks.forEach(c => { c.classList.remove("probe", "red", "ok", "bad"); const b = c.querySelector(".kbadge"); if (b) b.remove(); });
+  prevMarks = [];
+  const j = S.cj[k];
+  if (e && e.t === "probe"){
+    const c = cells[e.pos]; c.classList.add("probe"); if (e.red) c.classList.add("red");
+    const b = document.createElement("span"); b.className = "kbadge" + (e.k === 0 ? " zero" : ""); b.textContent = e.k === 0 ? "k = 0" : "+" + e.k; c.appendChild(b); prevMarks.push(c);
+  } else if (e && (e.t === "cmp" || e.t === "match")){
+    let q = k - 1; while (q >= 0 && (E[q].t === "cmp" || E[q].t === "match")) q--;
+    for (let r = q + 1; r < k; r++){ const ev = E[r]; if (ev.t !== "cmp") continue; const c = cells[ev.pos], p = pcells[ev.i]; c.classList.add(ev.ok ? "ok" : "bad"); p.classList.add(ev.ok ? "ok" : "bad"); prevMarks.push(c, p); }
+  }
+  const w = (cells[0]?.getBoundingClientRect().width || 34) + 2;
+  els.pat.style.transform = `translateX(${Math.min(j, n) * w}px)`;
+  const target = Math.max(0, j * w - els.box.clientWidth * 0.3);
+  if (Math.abs(els.box.scrollLeft - target) > w * 2) els.box.scrollLeft = target;
+  // code
+  document.querySelectorAll("#code .ln").forEach(l => l.classList.toggle("hl", e ? +l.dataset.l === e.line : +l.dataset.l === 0));
+  // bmBc
+  document.querySelectorAll("#bm .e").forEach(d => d.classList.remove("hit"));
+  if (e && e.t === "probe"){ const keyEl = [...document.querySelectorAll("#bm .e")].find(d => d.dataset.ch === e.ch) || document.querySelector('#bm .e[data-ch="__other"]'); if (keyEl) keyEl.classList.add("hit"); }
+  // counters
+  $("#vJ").textContent = j; $("#vP").textContent = S.cp[k]; $("#vC").textContent = S.cc[k]; $("#vM").textContent = S.cm[k];
+  const pct = n ? S.cr[k] / n * 100 : 0; $("#vR").textContent = `${pct.toFixed(1)}%  (${S.cr[k]} of ${n})`; $("#vRbar").style.width = pct + "%";
+  // transport
+  $("#stepl").textContent = `Step ${k} / ${N}`; $("#scrub").value = k;
+  [["#tFirst", k === 0], ["#tPrev", k === 0], ["#tNext", k === N], ["#tEnd", k === N], ["#tMatch", nextMatch() < 0]].forEach(([id, d]) => $(id).setAttribute("aria-disabled", d));
+  $("#narr").innerHTML = narrate(e);
+  drawMap();
+}
+function narrate(e){
+  const { n, m, x, y } = S;
+  if (!e) return `<span class="tg a">Ready</span>Window at j = 0. The dashed cells after the text are the sentinel: ${m} copies of x[m−1] = '${esc(x[m - 1])}'. Press ▶ or →.`;
+  if (e.t === "probe"){
+    const where = e.sent ? " (sentinel)" : "";
+    if (e.red) return `<span class="tg">ufast</span>Re‑read y[${e.pos}] = '${esc(e.ch)}'${where}: k is still 0, so j += 0 does not move. This is the ×3 unrolling.`;
+    return `<span class="tg">Probe</span>Read only the last char of the window: y[${e.pos}] = '${esc(e.ch)}'${where} → bmBc = <b>${e.k}</b>. ${e.k ? `Jump: j = ${e.j} + ${e.k} = ${e.j + e.k}, no comparisons.` : "k = 0 → the last char matches, stop and verify."}`;
+  }
+  if (e.t === "cmp") return `<span class="tg ${e.ok ? "g" : ""}">Verify</span>x[${e.i}] = '${esc(x[e.i])}' vs y[${e.pos}] = '${esc(S.Y[e.pos])}' → ${e.ok ? "equal" : "different: the window is discarded"}.`;
+  if (e.t === "match") return e.fake ? `<span class="tg">False match!</span>j = ${e.j} > n − m = ${n - m}: part of this "match" is the sentinel. This is why the program checks j ≤ n − m.` : `<span class="tg g">Match</span>The pattern occurs at j = <b>${e.j}</b> → posiciones.insertarAlFinal(${e.j}).`;
+  if (e.t === "out") return `<span class="tg a">Window out</span>j = ${e.j} > n − m: the window landed on the sentinel, no verification.`;
+  if (e.t === "shift") return `<span class="tg a">Shift</span>j = ${e.from} + ${S.T.shift} = <b>${e.to}</b>${e.to > (S.lec ? n - 1 : n - m) ? " → the loop condition fails, the search ends." : "."}`;
+  const F = S.cf[S.E.length];
+  return `<span class="tg g">Done</span>${S.cm[S.E.length]} match(es)${F ? ` <b style="color:#ff8a8d">+ ${F} false match(es) caused by j &lt; n</b>` : ""} · ${S.cp[S.E.length]} probes · ${S.cc[S.E.length]} comparisons · read ${S.cr[S.E.length]} of ${n} characters.`;
+}
+function nextMatch(){ if (!S) return -1; for (let q = k; q < S.E.length; q++) if (S.E[q].t === "match") return q + 1; return -1; }
+
+/* reading map */
+function drawMap(){
+  const cv = $("#map"), ctx = cv.getContext("2d"), W = cv.clientWidth, dpr = window.devicePixelRatio || 1;
+  const n = S.n, cols = Math.max(1, Math.min(n, Math.floor(W / 9))), rows = Math.ceil(n / cols), cell = W / cols, H = Math.max(40, Math.ceil(rows * cell));
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px"; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  for (let i = 0; i < n; i++){
+    const r = Math.floor(i / cols), c = i % cols, fr = S.firstRead[i];
+    ctx.fillStyle = (fr > 0 && fr <= k) ? (S.kind[i] === 1 ? "#e3262b" : "#3fd07f") : "#262722";
+    ctx.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
+    if (S.matchAt[i] > 0 && S.matchAt[i] <= k){ ctx.strokeStyle = "#3fd07f"; ctx.lineWidth = 1.5; ctx.strokeRect(c * cell + .75, r * cell + .75, cell - 1.5, cell - 1.5); }
+  }
+  const j = S.cj[k];
+  if (j < n){ const r = Math.floor(j / cols), c = j % cols; ctx.strokeStyle = "#f2efe9"; ctx.lineWidth = 2; ctx.strokeRect(c * cell, r * cell, cell, cell); }
+  $("#mapInfo").textContent = `${S.cr[k]} of ${n} read`;
+}
+
+/* race on the whole text */
+function race(x, y){
+  const algs = [["Brute force", "tries every window", readsNaive], ["Horspool", "1980", readsHor], ["Tuned BM", "this algorithm", readsTbm]];
+  const res = algs.map(([nm, sub, f]) => { const t0 = performance.now(); const r = f(x, y); const t1 = performance.now(); let reps = 0, tt = 0; while (tt < 25 && reps < 30){ const a = performance.now(); f(x, y); tt += performance.now() - a; reps++; } return { nm, sub, ...r, ms: reps ? tt / reps : t1 - t0 }; });
+  $("#race").innerHTML = res.map((r, i) => `<div class="lane2"><div class="nm">${r.nm}<small>${r.sub}</small></div><canvas id="rc${i}" height="30" aria-label="${r.nm} reads"></canvas><div class="v"><b>${r.tot.toLocaleString("en-US")}</b>${(r.tot / Math.max(1, y.length)).toFixed(2)} per char</div></div>`).join("");
+  const colors = ["#8c877e", "#6fb6ff", "#e3262b"];
+  res.forEach((r, i) => {
+    const cv = document.getElementById("rc" + i), ctx = cv.getContext("2d"), W = cv.clientWidth || 300, H = 30, dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(W * dpr); cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#0f100e"; ctx.fillRect(0, 0, W, H);
+    const n = y.length, bins = Math.min(n, Math.floor(W)), per = n / bins;
+    for (let b = 0; b < bins; b++){ let s = 0, cnt = 0; for (let p = Math.floor(b * per); p < Math.floor((b + 1) * per); p++){ s += r.R[p] > 0 ? 1 : 0; cnt++; } const f = cnt ? s / cnt : 0; if (f > 0){ ctx.globalAlpha = .25 + .75 * f; ctx.fillStyle = colors[i]; const x0 = b * (W / bins); ctx.fillRect(x0, 3, Math.max(1, W / bins), H - 6); } }
+    ctx.globalAlpha = 1;
+  });
+  const [nv, hv, tv] = res;
+  $("#raceInfo").textContent = `${y.length.toLocaleString("en-US")} chars · ${tv.c} match(es)`;
+  $("#verdict").innerHTML = tv.c !== nv.c ? `Counts differ: brute force ${nv.c}, Tuned BM ${tv.c}.` :
+    `Same ${tv.c} match(es) for all three. <b>Tuned BM read ${(tv.tot / nv.tot * 100).toFixed(0)}% of what brute force read</b> (${(tv.tot / Math.max(1, hv.tot) * 100).toFixed(0)}% of Horspool's reads, which include its redundant ufast probes). Time per search in this browser: brute force ${nv.ms.toFixed(3)} ms · Horspool ${hv.ms.toFixed(3)} ms · Tuned BM ${tv.ms.toFixed(3)} ms.`;
+}
+
+/* ---------------- Controls ---------------- */
+function setPlay(on){
+  if (on && S && k >= S.E.length) k = 0;
+  if (on){ timer = setTimeout(function tick(){ if (!S || k >= S.E.length){ setPlay(false); return; } k++; render(); timer = setTimeout(tick, +$("#spd").value); }, 60); }
+  else { clearTimeout(timer); timer = null; }
+  $("#tPlay").setAttribute("aria-label", on ? "Pause" : "Play");
+  $("#playIco").innerHTML = on ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M7 5v14l12-7z"/>';
+}
+const go = v => { if (!S) return; setPlay(false); k = Math.max(0, Math.min(S.E.length, v)); render(); };
+$("#tFirst").addEventListener("click", () => go(0));
+$("#tPrev").addEventListener("click", () => go(k - 1));
+$("#tNext").addEventListener("click", () => go(k + 1));
+$("#tEnd").addEventListener("click", () => go(S ? S.E.length : 0));
+$("#tMatch").addEventListener("click", () => { const q = nextMatch(); if (q > 0) go(q); });
+$("#tPlay").addEventListener("click", () => setPlay(!timer));
+$("#scrub").addEventListener("input", e => go(+e.target.value));
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input,textarea,select")) return;
+  if (e.key === "ArrowRight"){ e.preventDefault(); go(k + 1); }
+  else if (e.key === "ArrowLeft"){ e.preventDefault(); go(k - 1); }
+  else if (e.key === " "){ e.preventDefault(); setPlay(!timer); }
+  else if (e.key === "Home"){ go(0); } else if (e.key === "End"){ go(S ? S.E.length : 0); }
+  else if (e.key.toLowerCase() === "m"){ const q = nextMatch(); if (q > 0) go(q); }
+});
+
+function run(){
+  const y = $("#txt").value.replace(/\r\n?/g, "\n"), x = $("#pat").value, lec = $("#lecroq").checked;
+  const err = $("#err"); err.textContent = "";
+  if (!x){ err.textContent = "Type a pattern of at least one character."; return; }
+  if (!y){ err.textContent = "The text is empty. Type a text or load a .txt file."; return; }
+  if (x.length > y.length && !lec){ err.textContent = `The pattern (${x.length} chars) is longer than the text (${y.length}): 0 occurrences.`; }
+  setPlay(false);
+  fullText = y;
+  S = prepare(x, y.replace(/\n/g, " "), lec);
+  k = 0; prevMarks = [];
+  buildTape(); render();
+  race(x, y);
+}
+$("#run").addEventListener("click", run);
+$("#pat").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+$("#txt").addEventListener("input", () => { $("#txtInfo").textContent = `${$("#txt").value.length.toLocaleString("en-US")} characters`; document.querySelectorAll(".chip").forEach(c => c.classList.remove("on")); });
+$("#file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (!/\.txt$/i.test(f.name)){ $("#err").textContent = "That file is not a .txt. Choose a plain text file."; return; }
+  const rd = new FileReader();
+  rd.onload = () => { const t = String(rd.result); if (!t.length){ $("#err").textContent = "The file is empty."; return; } $("#txt").value = t; $("#txtInfo").textContent = `${f.name} · ${t.length.toLocaleString("en-US")} characters`; document.querySelectorAll(".chip").forEach(c => c.classList.remove("on")); run(); };
+  rd.readAsText(f);
+});
+$("#presets").innerHTML = PRESETS.map((p, i) => `<button class="chip" type="button" data-i="${i}">${p.name}</button>`).join("");
+document.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+  const p = PRESETS[+b.dataset.i];
+  $("#txt").value = p.y; $("#pat").value = p.x; $("#lecroq").checked = p.lec;
+  $("#txtInfo").textContent = `${p.y.length} characters`;
+  document.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c === b));
+  run();
+}));
+let rT; window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(() => { if (S){ render(); race($("#pat").value, fullText); } }, 200); });
+document.querySelector('.chip[data-i="0"]').click();
+})();
+</script>
