@@ -37,6 +37,8 @@ The page is a single self-contained `index.html`: no build step, no dependencies
 
 You can also drag the timeline; green marks show where matches happen.
 
+**Light / dark mode:** use the sun/moon button in the top bar. The page follows your system setting until you pick one, and remembers your choice.
+
 **Examples** (small chips above the stage): *Short sentence* (`casa`, the default), *Exercise 2* (`CASA`), *Best case* (`SOL` in `MAR MAR …`), *Worst case* (`aaaa` in 24 `a`s) and *Sentinel trap (j < n)* — with Lecroq's `j < n` condition, `ESE` in `TU VES` produces a false match at `j = 4` that uses the sentinel.
 
 ## What you see
