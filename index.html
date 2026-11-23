@@ -240,6 +240,15 @@ footer{max-width:1560px;margin:0 auto;padding-block:8px 34px}
 .lk:hover{border-color:var(--red);color:#fff;background:rgba(227,38,43,.15)}
 .lk i{font-style:normal;font-family:var(--f-mono);font-weight:700;color:var(--red)}
 .course{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:14px;font-size:.76rem;color:var(--muted)}
+.card .who .mail{display:inline-block;margin-top:3px;font-family:var(--f-mono);font-size:.74rem;color:var(--fg-2);text-decoration:none;overflow-wrap:anywhere}
+.card .who .mail:hover{color:var(--red)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 18px;margin:14px 0 0;padding:14px 16px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.facts div{min-width:0}
+.facts .repo{grid-column:1/-1;padding-top:10px;border-top:1px solid var(--line)}
+.facts dt{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:var(--f-mono)}
+.facts dd{margin:2px 0 0;font-size:.82rem;color:var(--fg-2);overflow-wrap:anywhere}
+.facts dd a{color:var(--fg-2);text-decoration:none;font-family:var(--f-mono);font-size:.76rem}
+.facts dd a:hover{color:var(--red)}
 
 /* ---------- animations ---------- */
 @keyframes hop{0%{transform:translateY(0) scale(1)}45%{transform:translateY(-16px) scale(1.14)}100%{transform:translateY(-6px) scale(1.04)}}
@@ -377,22 +386,29 @@ footer{max-width:1560px;margin:0 auto;padding-block:8px 34px}
 <footer class="gut">
   <div class="cards">
     <div class="card">
-      <div class="av" aria-hidden="true">CC</div>
-      <div class="who"><b>Camilo Colmenares</b><small>Part I · How it works</small>
+      <div class="av" aria-hidden="true">DC</div>
+      <div class="who"><b>David Camilo Colmenares Hernandez</b><small>Part I · How it works</small>
+        <a class="mail" href="mailto:davidcamiloch@ufps.edu.co">davidcamiloch@ufps.edu.co</a>
         <div class="links"><a class="lk" href="https://github.com/Camilo0812A" target="_blank" rel="noopener"><i>&lt;/&gt;</i>GitHub</a><a class="lk" href="https://www.linkedin.com/in/camilo-colmenares-7b96a6281" target="_blank" rel="noopener"><i>↗</i>LinkedIn</a></div>
       </div>
     </div>
     <div class="card">
-      <div class="av" aria-hidden="true">DG</div>
-      <div class="who"><b>Didier Gómez</b><small>Part II · Practice &amp; analysis</small>
+      <div class="av" aria-hidden="true">DJ</div>
+      <div class="who"><b>Didier Olinto Jaimes Gómez</b><small>Part II · Practice &amp; analysis</small>
+        <a class="mail" href="mailto:didierolintojg@ufps.edu.co">didierolintojg@ufps.edu.co</a>
         <div class="links"><a class="lk" href="https://github.com/DidierrJG" target="_blank" rel="noopener"><i>&lt;/&gt;</i>GitHub</a><a class="lk" href="https://www.linkedin.com/in/didier-olinto-jaimes-gomez-4a0255327" target="_blank" rel="noopener"><i>↗</i>LinkedIn</a></div>
       </div>
     </div>
   </div>
-  <div class="course">
-    <a class="lk" href="https://github.com/Camilo0812A/tuned-boyer-moore-simulator" target="_blank" rel="noopener"><i>&lt;/&gt;</i>Source code</a>
-    <span>Analysis of Algorithms · Systems Engineering · UFPS · Prof. Marco A. Adarme Jaimes</span>
-  </div>
+  <dl class="facts">
+    <div><dt>Course</dt><dd>Analysis of Algorithms</dd></div>
+    <div><dt>Program</dt><dd>Systems Engineering</dd></div>
+    <div><dt>University</dt><dd>Universidad Francisco de Paula Santander (UFPS)</dd></div>
+    <div><dt>Professor</dt><dd>Marco Antonio Adarme Jaimes</dd></div>
+    <div><dt>Location</dt><dd>Cúcuta, Norte de Santander, Colombia</dd></div>
+    <div><dt>Date</dt><dd><time datetime="2026-11-25">November 25, 2026</time></dd></div>
+    <div class="repo"><dt>Repository</dt><dd><a href="https://github.com/Camilo0812A/tuned-boyer-moore-simulator" target="_blank" rel="noopener">github.com/Camilo0812A/tuned-boyer-moore-simulator</a></dd></div>
+  </dl>
 </footer>
 
 <script>

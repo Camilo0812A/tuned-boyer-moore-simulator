@@ -6,6 +6,8 @@ An interactive, step-by-step simulator of the **Tuned Boyer-Moore** string match
 
 **Live version:** https://camilo0812a.github.io/tuned-boyer-moore-simulator/
 
+**Repository:** https://github.com/Camilo0812A/tuned-boyer-moore-simulator
+
 ![Tuned Boyer-Moore Lab: the "Short sentence" example at its first match (j = 3)](screenshot.png)
 
 The page is a single self-contained `index.html`: no build step, no dependencies except Google Fonts.
@@ -69,14 +71,22 @@ You can also drag the timeline; green marks show where matches happen.
 | Search, best case | O(n / m) |
 | Search, average | sublinear, like Horspool (fewer instructions per character thanks to the unrolled loop) |
 
-## Team
+## Authors
 
-| | Role | Links |
-| --- | --- | --- |
-| **Camilo Colmenares** | Part I · How it works | [GitHub](https://github.com/Camilo0812A) · [LinkedIn](https://www.linkedin.com/in/camilo-colmenares-7b96a6281) |
-| **Didier Gómez** | Part II · Practice & analysis | [GitHub](https://github.com/DidierrJG) · [LinkedIn](https://www.linkedin.com/in/didier-olinto-jaimes-gomez-4a0255327) |
+| Name | Email | Role | Links |
+| --- | --- | --- | --- |
+| **David Camilo Colmenares Hernandez** | [davidcamiloch@ufps.edu.co](mailto:davidcamiloch@ufps.edu.co) | Part I · How it works | [GitHub](https://github.com/Camilo0812A) · [LinkedIn](https://www.linkedin.com/in/camilo-colmenares-7b96a6281) |
+| **Didier Olinto Jaimes Gómez** | [didierolintojg@ufps.edu.co](mailto:didierolintojg@ufps.edu.co) | Part II · Practice & analysis | [GitHub](https://github.com/DidierrJG) · [LinkedIn](https://www.linkedin.com/in/didier-olinto-jaimes-gomez-4a0255327) |
 
-Analysis of Algorithms · Systems Engineering · Universidad Francisco de Paula Santander (UFPS) · Prof. Marco A. Adarme Jaimes
+| | |
+| --- | --- |
+| Course | Analysis of Algorithms |
+| Program | Systems Engineering |
+| University | Universidad Francisco de Paula Santander (UFPS) |
+| Professor | Marco Antonio Adarme Jaimes |
+| Location | Cúcuta, Norte de Santander, Colombia |
+| Date | November 25, 2026 |
+| Repository | https://github.com/Camilo0812A/tuned-boyer-moore-simulator |
 
 ## References
 
